@@ -11,60 +11,91 @@ import CryptoKit
 
 struct ContentView: View {
     @StateObject var viewModel = AppAttestViewModel()
-   
-
+    
+    
     var body: some View {
-        VStack {
-            Text("App Attest Example")
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    
+                    if UserDefaults.standard.string(forKey: "appAttestKeyId") == nil {
+                        Button("Generate Attestation Key") {
+                            viewModel.generateAttestationKey()
+                        }.buttonStyle(PrimaryButtonStyle())
+                            .disabled(viewModel.isLoading)
+                        
+                        if viewModel.keyIdentifier != nil {
+                            keyIdentifierSection
+                            if let attestationObjectString = viewModel.attestationObjectString {
+                                Section(header: Text("Attestation Object")) {
+                                                Text(attestationObjectString)
+                                                    .padding()
+                                                    .border(Color.gray, width: 1)
+                                                    .cornerRadius(8)
+                                            }
 
-            if UserDefaults.standard.string(forKey: "appAttestKeyId") == nil {
-                Button("Generate Attestation Key") {
-                    viewModel.generateAttestationKey()
-                }
-                .disabled(viewModel.isLoading)
-                
-                if let keyIdentifier = viewModel.keyIdentifier {
-                    CopyableTextView(text: "Key Identifier: \(keyIdentifier)")
-                        .padding()
-                    if viewModel.attestationObjectString == nil {
-                        if viewModel.isAttestationChallengeReceived {
-                                        // UI that allows the user to proceed with the attestation
-                            Button("Create Attestation", action: viewModel.createAttestationObject)
-                                    } else {
-                                        // UI indicating that the challenge is being fetched
-                                        Text("Fetching attestation challenge...")
-                                            .onAppear(perform: viewModel.requestAttestationChallenge)
-                                    }
-                        Button("Create Attestation Object") {
-                            viewModel.createAttestationObject()
+                            }
                         }
-                        .disabled(viewModel.isLoading)
                     }
+                    else {
+                        assertionSection
+                    }
+                    
+
                 }
+                .padding()
+                .navigationTitle("App Attest Example")
             }
-            else {
-                if viewModel.isAssertionChallengeReceived {
-                    Button("Send Assertion to Server"){
-                        viewModel.createAndSendAssertion()
-                    }
-                    } else {
-                        // UI indicating that the challenge is being fetched
-                        Text("Fetching assertion challenge...")
-                            .onAppear(perform: viewModel.requestAssertionChallenge)
-                    }
-                }
-            
-
-
-
-            if let attestationObjectString = viewModel.attestationObjectString {
-                CopyableTextView(text: "Attestation Object: \(attestationObjectString)")
-                    .padding()
+            .alert(isPresented: $viewModel.showAlert) {
+                Alert(title: Text("Status"), message: Text(viewModel.alertMessage), dismissButton: .default(Text("OK")))
             }
         }
-        .alert(isPresented: $viewModel.showAlert) {
-            Alert(title: Text("Status"), message: Text(viewModel.alertMessage), dismissButton: .default(Text("OK")))
+    }
+    
+    private var keyIdentifierSection: some View {
+        Section(header: Text("Key Identifier")) {
+            Text(viewModel.keyIdentifier ?? "Not Available")
+                .padding()
+                .border(Color.gray, width: 1)
+                .cornerRadius(8)
+
+            if viewModel.attestationObjectString == nil {
+                if viewModel.isAttestationChallengeReceived {
+                    Button("Create Attestation", action: viewModel.createAttestationObject)
+                        .buttonStyle(PrimaryButtonStyle())
+                } else {
+                    Text("Fetching attestation challenge...")
+                        .onAppear(perform: viewModel.requestAttestationChallenge)
+                }
+            }
         }
+    }
+    private var assertionSection: some View {
+        Section(header: Text("Key Identifier")) {
+            Text(UserDefaults.standard.string(forKey: "appAttestKeyId") ?? "Not Available")
+                .padding()
+                .border(Color.gray, width: 1)
+                .cornerRadius(8)
+            if viewModel.isAssertionChallengeReceived {
+                            Button("Create & Send Assertion to Server"){
+                                viewModel.createAndSendAssertion()
+                            }.buttonStyle(PrimaryButtonStyle())
+                        } else {
+                            // UI indicating that the challenge is being fetched
+                            Text("Fetching assertion challenge...")
+                                .onAppear(perform: viewModel.requestAssertionChallenge)
+                        }
+        }
+    }
+}
+
+struct PrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Self.Configuration) -> some View {
+        configuration.label
+            .padding()
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(8)
     }
 }
 
