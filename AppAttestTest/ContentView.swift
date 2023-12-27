@@ -113,6 +113,15 @@ class AppAttestViewModel: ObservableObject {
     init(){
         keyIdentifier = UserDefaults.standard.string(forKey: "appAttestKeyId");
     }
+    
+    func loadConfigValue(forKey key: String) -> String {
+            guard let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
+                  let dict = NSDictionary(contentsOfFile: path) as? [String: AnyObject],
+                  let value = dict[key] as? String else {
+                fatalError("Missing or invalid key in Config.plist")
+            }
+            return value
+        }
    
     func generateAttestationKey() {
         isLoading = true
@@ -134,7 +143,8 @@ class AppAttestViewModel: ObservableObject {
     }
     
     func requestAttestationChallenge() {
-        guard let url = URL(string: "https://attestation-verification.vercel.app/generate-attestion-challenge") else { return }
+        let urlString = loadConfigValue(forKey: "AttestationChallengeURL")
+        guard let url = URL(string: urlString) else { return }
 
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
             // Check if an error occurred
@@ -218,7 +228,8 @@ class AppAttestViewModel: ObservableObject {
     
     func sendAttestationToServer(attestationObject: Data, keyId: String,correlationId: String ) {
             // Prepare URL and URLRequest
-            guard let url = URL(string: "https://attestation-verification.vercel.app/verify-attestation") else {
+        let urlString = loadConfigValue(forKey: "VerifyAttestationURL")
+        guard let url = URL(string: urlString) else {
                 alertMessage = "Invalid server URL."
                 showAlert = true
                 return
@@ -293,7 +304,9 @@ struct CopyableTextView: UIViewRepresentable {
 
 extension AppAttestViewModel {
     func requestAssertionChallenge() async -> String? {
-        guard let url = URL(string: "https://attestation-verification.vercel.app/generate-assertion-challenge") else { return nil }
+        let urlString = loadConfigValue(forKey: "AssertionChallengeURL")
+        guard let url = URL(string: urlString) else { return nil }
+       // guard let url = URL(string: "https://attestation-verification.vercel.app/generate-assertion-challenge") else { return nil }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -366,7 +379,8 @@ extension AppAttestViewModel {
     }
 
     private func sendAssertionToServer(clientData: Data, assertion: Data, keyId: String) {
-        guard let url = URL(string: "https://attestation-verification.vercel.app/verify-assertion") else {
+        let urlString = loadConfigValue(forKey: "VerifyAssertionURL")
+        guard let url = URL(string: urlString) else  {
             print("Invalid URL")
             return
         }

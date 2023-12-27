@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!--
-   Config.plist
-   AppAttestTest
-
-   Created by Pushp Abrol on 12/27/23.
-   Copyright (c) 2023 ___ORGANIZATIONNAME___. All rights reserved.
--->
 <plist version="1.0">
-<dict/>
+<dict>
+	<key>AssertionChallengeURL</key>
+	<string>https://attestation-verification.vercel.app/generate-assertion-challenge</string>
+	<key>VerifyAttestationURL</key>
+	<string>https://attestation-verification.vercel.app/verify-attestation</string>
+	<key>VerifyAssertionURL</key>
+	<string>https://attestation-verification.vercel.app/verify-assertion</string>
+	<key>AttestationChallengeURL</key>
+	<string>https://attestation-verification.vercel.app/generate-attestion-challenge</string>
+</dict>
 </plist>
