@@ -76,15 +76,13 @@ struct ContentView: View {
                 .padding()
                 .border(Color.gray, width: 1)
                 .cornerRadius(8)
-            if viewModel.isAssertionChallengeReceived {
-                            Button("Create & Send Assertion to Server"){
-                                viewModel.createAndSendAssertion()
+     
+                            Button("Create & Send Assertion to Server") {
+                                Task {
+                                    await viewModel.createAndSendAssertion()
+                                }
                             }.buttonStyle(PrimaryButtonStyle())
-                        } else {
-                            // UI indicating that the challenge is being fetched
-                            Text("Fetching assertion challenge...")
-                                .onAppear(perform: viewModel.requestAssertionChallenge)
-                        }
+                       
         }
     }
 }
@@ -105,6 +103,7 @@ class AppAttestViewModel: ObservableObject {
     @Published var alertMessage = ""
     @Published var keyIdentifier: String? // Store the key identifier
     @Published var attestationChallenge: String? // Store the attestation challenge
+    @Published var  attestationCorrelationId: String?
     @Published var attestationObjectString: String?
     @Published var isAttestationChallengeReceived = false
     @Published var assertionChallenge: String? // Store the attestation challenge
@@ -155,12 +154,15 @@ class AppAttestViewModel: ObservableObject {
                     // Define a Codable struct that matches the JSON structure
                     struct Response: Codable {
                         var attestationChallenge: String
+                        var correlationId: String
                         
                     }
                     
                     // Decode the JSON data
                     let jsonResponse = try JSONDecoder().decode(Response.self, from: data)
+                    print(jsonResponse)
                     self.attestationChallenge = jsonResponse.attestationChallenge
+                    self.attestationCorrelationId = jsonResponse.correlationId
                     self.isAttestationChallengeReceived = true
                     // Use the decoded data
                 } catch {
@@ -172,44 +174,7 @@ class AppAttestViewModel: ObservableObject {
         task.resume()
     }
     
-    func requestAssertionChallenge() {
-        guard let url = URL(string: "https://attestation-verification.vercel.app/generate-assertion-challenge") else { return }
 
-        let task = URLSession.shared.dataTask(with: url) { data, response, error in
-            DispatchQueue.main.async {
-            // Check if an error occurred
-            if let error = error {
-                print("Error making request: \(error.localizedDescription)")
-                return
-            }
-           
-                // Check if data was received
-                guard let data = data else {
-                    print("No data received")
-                    return
-                }
-                
-                // Attempt to decode the JSON response
-                do {
-                    // Define a Codable struct that matches the JSON structure
-                    struct Response: Codable {
-                        var assertionChallenge: String
-                        
-                    }
-                    
-                    // Decode the JSON data
-                    let jsonResponse = try JSONDecoder().decode(Response.self, from: data)
-                    self.assertionChallenge = jsonResponse.assertionChallenge
-                    self.isAssertionChallengeReceived = true
-                    // Use the decoded data
-                } catch {
-                    print("Error decoding JSON: \(error.localizedDescription)")
-                }
-            }
-        }
-
-        task.resume()
-    }
     
     func createAttestationObject() {
             guard let keyIdentifier = keyIdentifier else {
@@ -240,7 +205,7 @@ class AppAttestViewModel: ObservableObject {
                         print(attestationObject.base64EncodedString());
                         self?.alertMessage = "Attestation object created successfully."
                         self?.showAlert = true
-                        self?.sendAttestationToServer(attestationObject: attestationObject, keyId: keyIdentifier)
+                        self?.sendAttestationToServer(attestationObject: attestationObject, keyId: keyIdentifier, correlationId: self!.attestationCorrelationId!)
                     }
                 }
             }
@@ -251,7 +216,7 @@ class AppAttestViewModel: ObservableObject {
             }
         }
     
-    func sendAttestationToServer(attestationObject: Data, keyId: String) {
+    func sendAttestationToServer(attestationObject: Data, keyId: String,correlationId: String ) {
             // Prepare URL and URLRequest
             guard let url = URL(string: "https://attestation-verification.vercel.app/verify-attestation") else {
                 alertMessage = "Invalid server URL."
@@ -266,7 +231,8 @@ class AppAttestViewModel: ObservableObject {
             // Prepare the JSON body
             let body: [String: Any] = [
                 "attestationObject": attestationObject.base64EncodedString(),
-                "keyId": keyId
+                "keyId": keyId,
+                "correlationId" : correlationId
             ]
             
             do {
@@ -326,14 +292,44 @@ struct CopyableTextView: UIViewRepresentable {
 }
 
 extension AppAttestViewModel {
-    func createAndSendAssertion() {
+    func requestAssertionChallenge() async -> String? {
+        guard let url = URL(string: "https://attestation-verification.vercel.app/generate-assertion-challenge") else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: String] = ["keyId": self.keyIdentifier!]
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
+            print("Failed to encode JSON")
+            return nil
+        }
+
+        request.httpBody = httpBody
+
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            struct Response: Codable {
+                var assertionChallenge: String
+            }
+            let jsonResponse = try JSONDecoder().decode(Response.self, from: data)
+            print("Assertion Challenge created!")
+            print(jsonResponse.assertionChallenge)
+            return jsonResponse.assertionChallenge
+        } catch {
+            print("Error making request: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    func createAndSendAssertion() async {
         guard let keyIdentifier = keyIdentifier else {
             alertMessage = "Key identifier is not available."
             showAlert = true
             return
         }
-        let challenge =  self.assertionChallenge!
-        let assertionContent = ["userId": "User123", "client_id": "1234", "challenge" : challenge] as [String: Any]
+        let challenge =  await requestAssertionChallenge()
+        let assertionContent = ["userId": "User123", "client_id": "1234", "challenge" : challenge!] as [String: Any]
         guard let jsonData = try? JSONSerialization.data(withJSONObject: assertionContent) else {
             alertMessage = "Failed to encode assertion content."
             showAlert = true
@@ -341,6 +337,7 @@ extension AppAttestViewModel {
         }
         print(jsonData);
         signAndSendAssertion(jsonData: jsonData, keyId: keyIdentifier)
+        
     }
 
     func signAndSendAssertion(jsonData: Data, keyId: String) {
@@ -361,6 +358,8 @@ extension AppAttestViewModel {
                 if let assertion = assertion {
                     // Send the assertion to your server
                     self.sendAssertionToServer(clientData: jsonData,assertion: assertion, keyId: keyId)
+                    self.assertionChallenge = nil
+                    self.isAssertionChallengeReceived = false
                 }
             }
         }
