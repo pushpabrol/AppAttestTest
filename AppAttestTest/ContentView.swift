@@ -349,16 +349,16 @@ extension AppAttestViewModel {
             return
         }
         print(jsonData);
-        signAndSendAssertion(jsonData: jsonData, keyId: keyIdentifier)
+        signAndSendAssertion(jsonData: jsonData, keyIdentifier: keyIdentifier)
         
     }
 
-    func signAndSendAssertion(jsonData: Data, keyId: String) {
+    private func signAndSendAssertion(jsonData: Data, keyIdentifier: String) {
         // Create a client data hash
         let clientDataHash = SHA256.hash(data: jsonData)
         let clientDataHashData = Data(clientDataHash)
 
-        DCAppAttestService.shared.generateAssertion(keyId, clientDataHash: clientDataHashData) { [weak self] (assertion, error) in
+        DCAppAttestService.shared.generateAssertion(keyIdentifier, clientDataHash: clientDataHashData) { [weak self] (assertion, error) in
             DispatchQueue.main.async {
                 guard let self = self else { return }
 
@@ -370,7 +370,7 @@ extension AppAttestViewModel {
 
                 if let assertion = assertion {
                     // Send the assertion to your server
-                    self.sendAssertionToServer(clientData: jsonData,assertion: assertion, keyId: keyId)
+                    self.sendAssertionToServer(clientData: jsonData,assertion: assertion, keyId: keyIdentifier)
                     self.assertionChallenge = nil
                     self.isAssertionChallengeReceived = false
                 }
