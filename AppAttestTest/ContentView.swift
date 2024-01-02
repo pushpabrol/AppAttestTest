@@ -164,7 +164,6 @@ class AppAttestViewModel: ObservableObject {
                     // Define a Codable struct that matches the JSON structure
                     struct Response: Codable {
                         var attestationChallenge: String
-                        var correlationId: String
                         
                     }
                     
@@ -172,7 +171,6 @@ class AppAttestViewModel: ObservableObject {
                     let jsonResponse = try JSONDecoder().decode(Response.self, from: data)
                     print(jsonResponse)
                     self.attestationChallenge = jsonResponse.attestationChallenge
-                    self.attestationCorrelationId = jsonResponse.correlationId
                     self.isAttestationChallengeReceived = true
                     // Use the decoded data
                 } catch {
@@ -215,7 +213,7 @@ class AppAttestViewModel: ObservableObject {
                         print(attestationObject.base64EncodedString());
                         self?.alertMessage = "Attestation object created successfully."
                         self?.showAlert = true
-                        self?.sendAttestationToServer(attestationObject: attestationObject, keyId: keyIdentifier, correlationId: self!.attestationCorrelationId!)
+                        self?.sendAttestationToServer(attestationObject: attestationObject, keyId: keyIdentifier, attestationChallenge: self!.attestationChallenge!)
                     }
                 }
             }
@@ -226,7 +224,7 @@ class AppAttestViewModel: ObservableObject {
             }
         }
     
-    func sendAttestationToServer(attestationObject: Data, keyId: String,correlationId: String ) {
+    func sendAttestationToServer(attestationObject: Data, keyId: String,attestationChallenge: String ) {
             // Prepare URL and URLRequest
         let urlString = loadConfigValue(forKey: "VerifyAttestationURL")
         guard let url = URL(string: urlString) else {
@@ -243,7 +241,7 @@ class AppAttestViewModel: ObservableObject {
             let body: [String: Any] = [
                 "attestationObject": attestationObject.base64EncodedString(),
                 "keyId": keyId,
-                "correlationId" : correlationId
+                "attestationChallenge" : attestationChallenge
             ]
             
             do {
